@@ -1,0 +1,160 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ⚠️ IMPORTANTE: enums como String y JSON como String (sin native types ni @db.Text)
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  firstName    String
+  lastName     String
+  role         String   @default("nurse") // 'admin' | 'doctor' | 'nurse'
+  speciality   String?
+  isActive     Boolean  @default(true)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  AccessLogs       AccessLog[]
+  ModificationLogs ModificationLog[]
+  PrintLogs        PrintLog[]
+}
+
+model Patient {
+  id               String   @id @default(cuid())
+  firstName        String
+  lastName         String
+  gender           String?
+  dateOfBirth      DateTime?
+  documentType     String?
+  documentNumber   String?
+  phone            String?
+  email            String?
+  address          String?
+  bloodType        String?
+  // Guardamos como JSON serializado (texto). La API lo parsea al responder.
+  emergencyContact String?
+  isActive         Boolean  @default(true)
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  consultations     Consultation[]
+  documents         UploadedDocument[]
+  labResults        LabResult[]
+}
+
+model Consultation {
+  id                 String   @id @default(cuid())
+  patientId          String
+  patient            Patient  @relation(fields: [patientId], references: [id])
+  // La fecha la define el frontend o la capa de servicio
+  fecha              DateTime
+  estado             String? // 'borrador' | 'en_progreso' | 'completada'
+  motivo             String?
+  resumen            String?
+  medico             String?
+
+  padecimientoActual String?
+  signosVitales      String?
+  exploracionFisica  String?
+  diagnostico        String?
+  tratamiento        String?
+
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  labResults         LabResult[]
+
+  @@index([patientId])
+  @@index([fecha])
+}
+
+model UploadedDocument {
+  id         String   @id @default(cuid())
+  patientId  String
+  patient    Patient  @relation(fields: [patientId], references: [id])
+  tipo       String   // 'laboratorio' | 'imagen' | 'otro'
+  filename   String
+  mimetype   String
+  size       Int
+  path       String
+  ocrStatus  String   @default("pending") // 'pending' | 'done' | 'failed'
+  parsed     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  labResults LabResult[]
+}
+
+model LabResult {
+  id            String   @id @default(cuid())
+  patientId     String
+  patient       Patient  @relation(fields: [patientId], references: [id])
+  consultationId String?
+  consultation   Consultation? @relation(fields: [consultationId], references: [id])
+  source        String   @default("ocr") // 'manual' | 'ocr' | 'ai'
+  fechaInforme  DateTime? 
+  resumen       String?
+  documentId    String?
+  document      UploadedDocument? @relation(fields: [documentId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  values        LabValue[]
+  @@index([patientId])
+  @@index([consultationId])
+}
+
+model LabValue {
+  id           String   @id @default(cuid())
+  labResultId  String
+  labResult    LabResult @relation(fields: [labResultId], references: [id])
+  prueba       String
+  valor        String
+  unidad       String?
+  rango        String?
+  flag         String?
+  categoria    String?
+}
+
+model AccessLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  recurso   String
+  accion    String
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model ModificationLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  recurso   String
+  accion    String
+  diff      String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+model PrintLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  recurso   String
+  motivo    String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+}
+
+
